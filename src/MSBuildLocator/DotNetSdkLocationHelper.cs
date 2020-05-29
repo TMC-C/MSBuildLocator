@@ -63,7 +63,11 @@ namespace Microsoft.Build.Locator
 
             foreach (var basePath in basePaths)
             {
-                yield return GetInstance(workingDirectory, basePath);
+                var instance = GetInstance(workingDirectory, basePath);
+                if (!(instance is null))
+                {
+                    yield return instance;
+                }
             }
         }
 
@@ -118,17 +122,21 @@ namespace Microsoft.Build.Locator
             var outputString = string.Join(Environment.NewLine, lines);
 
             var lineSdkIndex = lines.FindIndex(line => line.Contains(".NET Core SDKs installed"));
+            if (lineSdkIndex == -1)
+            {
+                lineSdkIndex = lines.FindIndex(line => line.Contains(".NET SDKs installed"));
+            }
 
             if (lineSdkIndex != -1)
             {
                 lineSdkIndex++; 
 
-                while (lineSdkIndex < lines.Count && !lines[lineSdkIndex].Contains(".NET Core runtimes installed"))
+                while (lineSdkIndex < lines.Count && !lines[lineSdkIndex].Contains(".NET Core runtimes installed") && !lines[lineSdkIndex].Contains(".NET runtimes installed"))
                 {
-                    var ma = SdkRegex.Match(lines[lineSdkIndex]);
+                    var ma = SdkRegex.Match(lines[lineSdkIndex++]);
 
-                    if (!ma.Success)
-                        break;
+                    if (!ma.Success || ma.Index != 2)
+                        continue;
 
                     var version = ma.Groups[1].Value.Trim();                     
                     var path = ma.Groups[2].Value.Trim();
@@ -139,9 +147,7 @@ namespace Microsoft.Build.Locator
 
                     // We insert at index 0 so that instance list will be sorted descending so that instances.FirstOrDefault() 
                     // will always return the latest installed version of dotnet SDK 
-                    basePaths.Insert(0, path);      
-
-                    lineSdkIndex++;
+                    basePaths.Insert(0, path);
                 }
             }
 
